@@ -1,0 +1,81 @@
+using Dapper;
+using Ecomm_Project_11.DataAccess.Repository.IRepository;
+using Ecomm_Project_11.Model;
+using Ecomm_Project_11.Utility;
+using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore.Metadata.Internal;
+using NuGet.Protocol.Plugins;
+
+namespace WebApplication_Ecomm_Project_11.Areas.Admin.Controllers
+{
+    [Area("Admin")]
+    [Authorize(Roles =SD.Role_Admin+","+SD.Role_Employe)]
+    public class CoverTypeController : Controller
+    {
+        private readonly IUnitOfWork _unitOfWork;
+        public CoverTypeController(IUnitOfWork unitOfWork)
+        {
+            _unitOfWork = unitOfWork; 
+        }
+        public IActionResult Index()
+        {
+            return View();
+        }
+        public IActionResult Upsert(int? id)
+        {
+            CoverType covertype = new CoverType();
+            if(id == null) return View(covertype);//create
+            //edit
+            //covertype = _unitOfWork.CoverType.Get(id.GetValueOrDefault());
+            DynamicParameters param = new DynamicParameters();
+            param.Add("id", id.GetValueOrDefault());
+            covertype = _unitOfWork.SPCall.OneRecord<CoverType>(SD.Proc_GetCoverType, param);
+            if (covertype == null) return NotFound();
+            return View(covertype);
+        }
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public IActionResult Upsert(CoverType covertype)
+        {
+            if (covertype == null) return BadRequest();
+            if(!ModelState.IsValid) return View(covertype);
+            DynamicParameters param =new DynamicParameters();
+            param.Add("name",covertype.Name);
+            if (covertype.Id == 0)
+                //_unitOfWork.CoverType.Add(covertype);
+                _unitOfWork.SPCall.Execute(SD.Proc_CreateCoverTypes, param);
+            else
+            {
+                param.Add("id",covertype.Id);
+                _unitOfWork.SPCall.Execute(SD.Proc_UpdateCoverTypes, param);
+            }
+                //_unitOfWork.CoverType.Update(covertype);
+            //_unitOfWork.Save();
+            return RedirectToAction(nameof(Index));
+
+        }
+        #region APIs
+        [HttpGet]
+        public IActionResult GetAll() 
+        {
+            //return Json(new {data=_unitOfWork.CoverType.GetAll()});
+            return Json(new { data = _unitOfWork.SPCall.List<CoverType>(SD.Proc_GetCoverTypes) });
+        }
+        [HttpDelete]
+        public IActionResult Delete(int id)
+        {
+            var covertypeInDb =_unitOfWork.CoverType.Get(id);
+            if(covertypeInDb == null)
+                return Json(new {success=false,Message="Something went wrong while delete data!!!"});
+            DynamicParameters param =new DynamicParameters();
+            param.Add("id",id);
+            _unitOfWork.SPCall.Execute(SD.Proc_DeleteCoverTypes, param);
+            //_unitOfWork.CoverType.Remove(covertypeInDb);
+           // _unitOfWork.Save();
+            return Json(new { success = true, Message = "data deleted successfully!!!!" });
+
+        }
+        #endregion
+    }
+}
